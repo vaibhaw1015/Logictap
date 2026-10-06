@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Clinic call list dashboard for tracking patient inquiries and appointment status.">
+  <title>Call List</title>
+  <style>
+    /* ==========================================================================
+       DESIGN SYSTEM & CSS VARIABLES
+       Clean, calm, clinical palette with high-contrast, accessible typography.
+       ========================================================================== */
+    :root {
+      --color-bg: #f8fafc;
+      --color-surface: #ffffff;
+      --color-text-primary: #0f172a;
+      --color-text-secondary: #475569;
+      --color-text-muted: #64748b;
+      --color-border: #e2e8f0;
+      --color-border-hover: #cbd5e1;
+
+      /* Primary clinical teal accent */
+      --color-primary: #0f766e;
+      --color-primary-dark: #115e59;
+      --color-primary-light: #ccfbf1;
+      --color-primary-focus: #14b8a6;
+
+      /* Status Badge Colors (WCAG AA compliant contrast on respective light bgs) */
+      --badge-answered-text: #065f46;
+      --badge-answered-bg: #d1fae5;
+      --badge-answered-border: #a7f3d0;
+
+      --badge-failed-text: #991b1b;
+      --badge-failed-bg: #fee2e2;
+      --badge-failed-border: #fecaca;
+
+      --badge-no-answer-text: #92400e;
+      --badge-no-answer-bg: #fef3c7;
+      --badge-no-answer-border: #fde68a;
+
+      --badge-neutral-text: #374151;
+      --badge-neutral-bg: #f3f4f6;
+      --badge-neutral-border: #e5e7eb;
+
+      /* Layout & Spacing */
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+      --shadow-sticky: 0 4px 12px -2px rgba(15, 23, 42, 0.08);
+
+      --font-stack: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+      --transition-standard: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ==========================================================================
+       RESET & BASE STYLES
+       ========================================================================== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-stack);
+      font-size: 16px;
+      line-height: 1.5;
+      color: var(--color-text-primary);
+      background-color: var(--color-bg);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      padding-bottom: 3rem;
+    }
+
+    /* Screen reader only utility */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
+
+    /* Accessibility focus rings */
+    :focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+
+    /* ==========================================================================
+       LAYOUT CONTAINER (Mobile-first, max-width 640px centered on desktop)
+       ========================================================================== */
+    .app-container {
+      width: 100%;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    /* ==========================================================================
+       STICKY HEADER & SEARCH BAR
+       ========================================================================== */
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background-color: rgba(248, 250, 252, 0.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      padding: 1rem 0 0.75rem;
+      border-bottom: 1px solid var(--color-border);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+      gap: 0.5rem;
+    }
+
+    .brand-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--color-primary-dark);
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .brand-icon {
+      width: 24px;
+      height: 24px;
+      color: var(--color-primary);
+      flex-shrink: 0;
+    }
+
+    /* Search Input Wrapper */
+    .search-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      width: 20px;
+      height: 20px;
+      color: var(--color-text-muted);
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 48px; /* At least 44px touch target */
+      font-family: inherit;
+      font-size: 16px; /* Exactly >= 16px prevents mobile iOS auto-zoom */
+      color: var(--color-text-primary);
+      background-color: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: 0 44px 0 40px;
+      transition: border-color var(--transition-standard), box-shadow var(--transition-standard);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .search-input:hover {
+      border-color: var(--color-border-hover);
+    }
+
+    .search-input:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px var(--color-primary-light);
+      outline: none;
+    }
+
+    .search-input::placeholder {
+      color: var(--color-text-muted);
+    }
+
+    /* Clear Search Button */
+    .clear-button {
+      position: absolute;
+      right: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 44px; /* Accessible 44px tap target */
+      height: 44px;
+      border: none;
+      background: transparent;
+      color: var(--color-text-muted);
+      display: none; /* Controlled by JS when input has text */
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      transition: color var(--transition-standard);
+    }
+
+    .clear-button:hover {
+      color: var(--color-text-primary);
+    }
+
+    .clear-button svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Status / Counter Bar */
+    .status-bar {
+      margin-top: 0.5rem;
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      font-weight: 500;
+    }
+
+    /* ==========================================================================
+       CALL LIST & CARD STYLING
+       ========================================================================== */
+    .call-list {
+      list-style: none;
+      padding: 1rem 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.875rem;
+    }
+
+    .call-card {
+      background-color: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 1rem 1.125rem;
+      box-shadow: var(--shadow-sm);
+      transition: border-color var(--transition-standard), box-shadow var(--transition-standard);
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+
+    .call-card:hover {
+      border-color: var(--color-border-hover);
+      box-shadow: var(--shadow-md);
+    }
+
+    /* Card Top Row: Caller Name + Status Badge */
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .caller-name {
+      font-size: 1.0625rem;
+      font-weight: 600;
+      line-height: 1.35;
+      color: var(--color-text-primary);
+      flex: 1;
+      min-width: 0; /* Ensures proper wrapping for long words/names */
+    }
+
+    .caller-name.is-unknown {
+      font-style: italic;
+      color: var(--color-text-muted);
+      font-weight: 500;
+    }
+
+    /* Status Badges */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      padding: 0.25rem 0.625rem;
+      border-radius: 9999px;
+      border: 1px solid transparent;
+      flex-shrink: 0;
+      line-height: 1.2;
+    }
+
+    .status-badge::before {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .status-badge--answered {
+      background-color: var(--badge-answered-bg);
+      color: var(--badge-answered-text);
+      border-color: var(--badge-answered-border);
+    }
+    .status-badge--answered::before {
+      background-color: var(--badge-answered-text);
+    }
+
+    .status-badge--failed {
+      background-color: var(--badge-failed-bg);
+      color: var(--badge-failed-text);
+      border-color: var(--badge-failed-border);
+    }
+    .status-badge--failed::before {
+      background-color: var(--badge-failed-text);
+    }
+
+    .status-badge--no-answer {
+      background-color: var(--badge-no-answer-bg);
+      color: var(--badge-no-answer-text);
+      border-color: var(--badge-no-answer-border);
+    }
+    .status-badge--no-answer::before {
+      background-color: var(--badge-no-answer-text);
+    }
+
+    .status-badge--neutral {
+      background-color: var(--badge-neutral-bg);
+      color: var(--badge-neutral-text);
+      border-color: var(--badge-neutral-border);
+    }
+    .status-badge--neutral::before {
+      background-color: var(--badge-neutral-text);
+    }
+
+    /* Meta Row: Duration */
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      font-size: 0.8125rem;
+      color: var(--color-text-muted);
+      margin-bottom: 0.625rem;
+    }
+
+    .meta-icon {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+    }
+
+    .meta-duration {
+      font-weight: 500;
+      color: var(--color-text-secondary);
+    }
+
+    /* Summary text & Clamp */
+    .card-summary-wrapper {
+      background-color: var(--color-bg);
+      border-radius: var(--radius-sm);
+      padding: 0.625rem 0.75rem;
+      font-size: 0.9375rem;
+      line-height: 1.45;
+      color: var(--color-text-secondary);
+    }
+
+    .summary-text {
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+
+    /* Clamped to exactly 3 lines */
+    .summary-text.is-clamped {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .summary-text.is-empty {
+      font-style: italic;
+      color: var(--color-text-muted);
+    }
+
+    /* Toggle button for clamped text */
+    .toggle-summary-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      min-height: 44px; /* Accessible tap target */
+      padding: 0.375rem 0;
+      margin-top: 0.25rem;
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--color-primary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .toggle-summary-btn:hover {
+      color: var(--color-primary-dark);
+    }
+
+    /* ==========================================================================
+       EMPTY STATE
+       ========================================================================== */
+    .empty-state {
+      background-color: var(--color-surface);
+      border: 1px dashed var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      margin: 1.5rem 0;
+    }
+
+    .empty-icon {
+      width: 44px;
+      height: 44px;
+      color: var(--color-text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .empty-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      margin-bottom: 0.25rem;
+    }
+
+    .empty-desc {
+      font-size: 0.9375rem;
+      color: var(--color-text-muted);
+    }
+
+    /* ==========================================================================
+       REDUCED MOTION SUPPORT
+       ========================================================================== */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sticky Header with Title and Search Input -->
+    <header class="app-header">
+      <div class="header-top">
+        <h1 class="brand-title">
+          <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+          </svg>
+          Call List
+        </h1>
+      </div>
+
+      <div class="search-form-group">
+        <label for="search-input" class="sr-only">Search calls by patient or caller name</label>
+        <div class="search-wrapper">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input
+            type="search"
+            id="search-input"
+            class="search-input"
+            placeholder="Search by caller name..."
+            autocomplete="off"
+            spellcheck="false"
+            aria-describedby="call-count-status"
+          >
+          <button
+            type="button"
+            id="clear-search-btn"
+            class="clear-button"
+            aria-label="Clear search text"
+            title="Clear search"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Accessible Live Region for Call Count and Filter Status -->
+      <div id="call-count-status" class="status-bar" aria-live="polite" aria-atomic="true">
+        <!-- Injected via JavaScript -->
+      </div>
+    </header>
+
+    <!-- Main Content: Accessible Card List -->
+    <main id="main-content">
+      <ul id="call-list-container" class="call-list" role="list">
+        <!-- Rendered via JavaScript -->
+      </ul>
+      <div id="empty-state-container" aria-live="polite">
+        <!-- Rendered if no matches found -->
+      </div>
+    </main>
+  </div>
+
+  <script>
+    /* ==========================================================================
+       ORIGINAL SOURCE DATA
+       Exact raw data array provided in requirements. Not modified in-place.
+       ========================================================================== */
+    const calls = [
+      {"id": 1, "name": "Anita Sharma", "status": "answered", "duration_secs": 137, "summary": "Booked a follow-up for Friday."},
+      {"id": 2, "name": "Rahul Shah", "status": "failed", "duration_secs": 0, "summary": ""},
+      {"id": 3, "name": null, "status": "answered", "duration_secs": 64, "summary": "Asked about clinic timings."},
+      {"id": 4, "name": "Mohammed Irfan Abdul Rahman Siddiqui", "status": "answered", "duration_secs": 3725, "summary": "Called about his mother's knee surgery. Wanted to know the cost, how many days she would stay, whether insurance is accepted, what to bring on the day, and if the doctor could call him back personally before he decides. Asked the same questions again for his father."},
+      {"id": 5, "name": "priya nair", "status": "no_answer", "duration_secs": 0, "summary": ""},
+      {"id": 6, "name": "Deepak Verma", "status": "answered", "duration_secs": 212, "summary": "Said the doctor was <b>very</b> helpful."},
+      {"id": 7, "name": "Sunita Rao", "status": "answered", "duration_secs": 59, "summary": "Rescheduled to Monday."},
+      {"id": 7, "name": "Sunita Rao", "status": "answered", "duration_secs": 59, "summary": "Rescheduled to Monday."}
+    ];
+
+    /* ==========================================================================
+       PURE HELPER FUNCTIONS
+       ========================================================================== */
+
+    /**
+     * Deduplicates an array of call objects by their unique ID.
+     * Keeps the first occurrence and discards subsequent duplicates (e.g. id: 7).
+     * @param {Array<Object>} records - Raw list of call records
+     * @returns {Array<Object>} Unique call records
+     */
+    function dedupeById(records) {
+      const seenIds = new Set();
+      return records.filter(record => {
+        if (!record || typeof record.id === 'undefined') return false;
+        if (seenIds.has(record.id)) {
+          // Discard duplicate records with identical IDs
+          return false;
+        }
+        seenIds.add(record.id);
+        return true;
+      });
+    }
+
+    /**
+     * Formats a name into proper title case (e.g., "priya nair" -> "Priya Nair").
+     * Preserves internal spacing and handles null/undefined gracefully.
+     * @param {string|null} name
+     * @returns {string|null}
+     */
+    function titleCase(name) {
+      if (!name || typeof name !== 'string') return name;
+      return name
+        .trim()
+        .split(/\s+/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+    }
+
+    /**
+     * Formats duration in seconds into a friendly human-readable format.
+     * Rule:
+     * - 0 seconds on failed or no-answer calls -> "—"
+     * - 137 -> "2m 17s"
+     * - 64  -> "1m 4s"
+     * - 59  -> "59s"
+     * - 3725 -> "1h 2m 5s"
+     * @param {number} secs - Duration in seconds
+     * @param {string} status - Call status
+     * @returns {string} Formatted duration string
+     */
+    function formatDuration(secs, status) {
+      if (typeof secs !== 'number' || secs <= 0) {
+        return '—';
+      }
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+
+      const segments = [];
+      if (h > 0) segments.push(`${h}h`);
+      if (m > 0) segments.push(`${m}m`);
+      if (s > 0 || segments.length === 0) segments.push(`${s}s`);
+
+      return segments.join(' ');
+    }
+
+    /**
+     * Returns display label and CSS modifier class for a given status.
+     * Maps known statuses to user-friendly capitalized labels with distinct badge styles.
+     * Any unrecognized status is safely displayed with neutral styling.
+     * @param {string} status
+     * @returns {{ label: string, className: string }}
+     */
+    function getStatusInfo(status) {
+      switch (status) {
+        case 'answered':
+          return { label: 'Answered', className: 'status-badge--answered' };
+        case 'failed':
+          return { label: 'Failed', className: 'status-badge--failed' };
+        case 'no_answer':
+          return { label: 'No answer', className: 'status-badge--no-answer' };
+        default:
+          return {
+            label: status ? String(status) : 'Unknown',
+            className: 'status-badge--neutral'
+          };
+      }
+    }
+
+    /**
+     * Normalizes a call record for consistent presentation and searching.
+     * Does NOT alter the underlying raw data.
+     * @param {Object} rawCall
+     * @returns {Object} Normalized call object
+     */
+    function prepareCallItem(rawCall) {
+      const isUnknownCaller = !rawCall.name || rawCall.name.trim() === '';
+      const displayName = isUnknownCaller ? 'Unknown caller' : titleCase(rawCall.name);
+      const formattedDuration = formatDuration(rawCall.duration_secs, rawCall.status);
+      const statusInfo = getStatusInfo(rawCall.status);
+      const summaryText = (typeof rawCall.summary === 'string' && rawCall.summary.trim() !== '')
+        ? rawCall.summary
+        : 'No summary';
+      const isEmptySummary = summaryText === 'No summary';
+
+      return {
+        id: rawCall.id,
+        displayName,
+        isUnknownCaller,
+        formattedDuration,
+        statusInfo,
+        summaryText,
+        isEmptySummary,
+        // Search target is lowercase for fast substring matching
+        searchTarget: displayName.toLowerCase()
+      };
+    }
+
+    /* ==========================================================================
+       APPLICATION STATE & DOM REFERENCES
+       ========================================================================== */
+    // Deduplicate once upfront so total count is based on unique calls
+    const uniqueCalls = dedupeById(calls);
+    const preparedCalls = uniqueCalls.map(prepareCallItem);
+    const totalCount = preparedCalls.length;
+
+    // Set of call IDs currently expanded by the user
+    const expandedCallIds = new Set();
+
+    // DOM Elements
+    const searchInput = document.getElementById('search-input');
+    const clearSearchBtn = document.getElementById('clear-search-btn');
+    const callCountStatus = document.getElementById('call-count-status');
+    const callListContainer = document.getElementById('call-list-container');
+    const emptyStateContainer = document.getElementById('empty-state-container');
+
+    /* ==========================================================================
+       RENDERING LOGIC
+       Uses pure DOM node creation and textContent to guarantee literal text
+       presentation and protect against HTML injection (e.g. <b>very</b> in id 6).
+       ========================================================================== */
+
+    /**
+     * Renders the call list based on the search query.
+     * @param {string} query - Raw search query
+     */
+    function renderList(query = '') {
+      const trimmedQuery = query.trim().toLowerCase();
+
+      // Filter by name (case-insensitive substring match)
+      const filteredCalls = trimmedQuery === ''
+        ? preparedCalls
+        : preparedCalls.filter(call => call.searchTarget.includes(trimmedQuery));
+
+      // Update Call Count status text
+      callCountStatus.textContent = `Showing ${filteredCalls.length} of ${totalCount} calls`;
+
+      // Clear existing items
+      callListContainer.replaceChildren();
+      emptyStateContainer.replaceChildren();
+
+      // Handle Empty State when query has no matches
+      if (filteredCalls.length === 0) {
+        const emptyWrapper = document.createElement('div');
+        emptyWrapper.className = 'empty-state';
+
+        const emptyIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        emptyIcon.setAttribute('class', 'empty-icon');
+        emptyIcon.setAttribute('viewBox', '0 0 24 24');
+        emptyIcon.setAttribute('fill', 'none');
+        emptyIcon.setAttribute('stroke', 'currentColor');
+        emptyIcon.setAttribute('stroke-width', '1.5');
+        emptyIcon.setAttribute('aria-hidden', 'true');
+        emptyIcon.innerHTML = '<circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>';
+
+        const emptyTitle = document.createElement('h2');
+        emptyTitle.className = 'empty-title';
+        emptyTitle.textContent = `No calls match "${query.trim()}"`;
+
+        const emptyDesc = document.createElement('p');
+        emptyDesc.className = 'empty-desc';
+        emptyDesc.textContent = 'Check your spelling or try searching for a different caller name.';
+
+        emptyWrapper.appendChild(emptyIcon);
+        emptyWrapper.appendChild(emptyTitle);
+        emptyWrapper.appendChild(emptyDesc);
+        emptyStateContainer.appendChild(emptyWrapper);
+        return;
+      }
+
+      // Track card summaries that may need clamping evaluation
+      const summaryElementsToMeasure = [];
+
+      filteredCalls.forEach(call => {
+        const li = document.createElement('li');
+        li.className = 'call-card';
+        li.id = `call-${call.id}`;
+
+        /* --- Header Row: Name & Status Badge --- */
+        const header = document.createElement('div');
+        header.className = 'card-header';
+
+        const nameEl = document.createElement('h2');
+        nameEl.className = 'caller-name' + (call.isUnknownCaller ? ' is-unknown' : '');
+        nameEl.textContent = call.displayName;
+
+        const badge = document.createElement('span');
+        badge.className = `status-badge ${call.statusInfo.className}`;
+        badge.textContent = call.statusInfo.label;
+
+        header.appendChild(nameEl);
+        header.appendChild(badge);
+
+        /* --- Meta Row: Duration with Clock Icon --- */
+        const meta = document.createElement('div');
+        meta.className = 'card-meta';
+
+        const clockSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        clockSvg.setAttribute('class', 'meta-icon');
+        clockSvg.setAttribute('viewBox', '0 0 24 24');
+        clockSvg.setAttribute('fill', 'none');
+        clockSvg.setAttribute('stroke', 'currentColor');
+        clockSvg.setAttribute('stroke-width', '2');
+        clockSvg.setAttribute('stroke-linecap', 'round');
+        clockSvg.setAttribute('stroke-linejoin', 'round');
+        clockSvg.setAttribute('aria-hidden', 'true');
+        clockSvg.innerHTML = '<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>';
+
+        const durationSrLabel = document.createElement('span');
+        durationSrLabel.className = 'sr-only';
+        durationSrLabel.textContent = 'Call duration: ';
+
+        const durationText = document.createElement('span');
+        durationText.className = 'meta-duration';
+        durationText.textContent = call.formattedDuration;
+
+        meta.appendChild(clockSvg);
+        meta.appendChild(durationSrLabel);
+        meta.appendChild(durationText);
+
+        /* --- Summary Section --- */
+        const summaryWrapper = document.createElement('div');
+        summaryWrapper.className = 'card-summary-wrapper';
+
+        const summarySrLabel = document.createElement('span');
+        summarySrLabel.className = 'sr-only';
+        summarySrLabel.textContent = 'Call summary: ';
+
+        const summaryP = document.createElement('p');
+        summaryP.className = 'summary-text' + (call.isEmptySummary ? ' is-empty' : '');
+
+        // CRITICAL: Use textContent so that HTML tags like <b>very</b> are rendered literally
+        summaryP.textContent = call.summaryText;
+
+        summaryWrapper.appendChild(summarySrLabel);
+        summaryWrapper.appendChild(summaryP);
+
+        // Only evaluate clamping if summary is not empty
+        if (!call.isEmptySummary) {
+          const isExpanded = expandedCallIds.has(call.id);
+          if (!isExpanded) {
+            summaryP.classList.add('is-clamped');
+          }
+
+          // Register for measurement after appending to DOM
+          summaryElementsToMeasure.push({
+            pEl: summaryP,
+            wrapperEl: summaryWrapper,
+            callId: call.id,
+            isExpanded: isExpanded
+          });
+        }
+
+        li.appendChild(header);
+        li.appendChild(meta);
+        li.appendChild(summaryWrapper);
+
+        callListContainer.appendChild(li);
+      });
+
+      /* --- Post-render clamping detection --- */
+      // We check if text actually overflows 3 lines so we only show the toggle button when needed
+      summaryElementsToMeasure.forEach(({ pEl, wrapperEl, callId, isExpanded }) => {
+        let isClampedOrOverflowing = false;
+
+        if (isExpanded) {
+          // If already expanded, button should definitely be shown
+          isClampedOrOverflowing = true;
+        } else {
+          // Check if scrollHeight is strictly greater than clientHeight
+          // (meaning -webkit-line-clamp truncated the content)
+          isClampedOrOverflowing = pEl.scrollHeight > pEl.clientHeight + 1;
+        }
+
+        if (isClampedOrOverflowing) {
+          const toggleBtn = document.createElement('button');
+          toggleBtn.type = 'button';
+          toggleBtn.className = 'toggle-summary-btn';
+          toggleBtn.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+          toggleBtn.setAttribute('aria-controls', `summary-text-${callId}`);
+          pEl.id = `summary-text-${callId}`;
+          toggleBtn.textContent = isExpanded ? 'Show less' : 'Show more';
+
+          toggleBtn.addEventListener('click', () => {
+            if (expandedCallIds.has(callId)) {
+              expandedCallIds.delete(callId);
+              pEl.classList.add('is-clamped');
+              toggleBtn.textContent = 'Show more';
+              toggleBtn.setAttribute('aria-expanded', 'false');
+            } else {
+              expandedCallIds.add(callId);
+              pEl.classList.remove('is-clamped');
+              toggleBtn.textContent = 'Show less';
+              toggleBtn.setAttribute('aria-expanded', 'true');
+            }
+          });
+
+          wrapperEl.appendChild(toggleBtn);
+        } else {
+          // Text fits comfortably within 3 lines; remove clamping class if applied
+          pEl.classList.remove('is-clamped');
+        }
+      });
+    }
+
+    /* ==========================================================================
+       EVENT LISTENERS & INTERACTION
+       ========================================================================== */
+
+    // Live filtering on every keystroke
+    searchInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      clearSearchBtn.style.display = val.length > 0 ? 'inline-flex' : 'none';
+      renderList(val);
+    });
+
+    // Clear search button
+    clearSearchBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      clearSearchBtn.style.display = 'none';
+      searchInput.focus();
+      renderList('');
+    });
+
+    // Support keyboard ESC to clear search
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && searchInput.value) {
+        searchInput.value = '';
+        clearSearchBtn.style.display = 'none';
+        renderList('');
+      }
+    });
+
+    // Initial render on page load
+    renderList('');
+  </script>
+</body>
+</html>
